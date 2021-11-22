@@ -39,7 +39,7 @@ pipeline {
                     sh "pre-commit run --all-files"
                 }
                 container('sonar') {
-                    sh "sonar-scanner -Dsonar.github.oauth=${env.GITHUB_TOKEN} -Dsonar.pullrequest.base=${CHANGE_TARGET} -Dsonar.pullrequest.branch=${BRANCH_NAME} -Dsonar.pullrequest.key=${env.CHANGE_ID} -Dsonar.pullrequest.provider=GitHub -Dsonar.pullrequest.github.repository=molgenis/<#REPO-NAME#>"
+                    sh "sonar-scanner -Dsonar.github.oauth=${env.GITHUB_TOKEN} -Dsonar.pullrequest.base=${CHANGE_TARGET} -Dsonar.pullrequest.branch=${BRANCH_NAME} -Dsonar.pullrequest.key=${env.CHANGE_ID} -Dsonar.pullrequest.provider=GitHub -Dsonar.pullrequest.github.repository=molgenis/molgenis-py-eucan-connect"
                 }
             }
         }
@@ -63,7 +63,7 @@ pipeline {
                 branch 'main'
             }
             environment {
-                REPOSITORY = 'molgenis/<#REPO-NAME#>'
+                REPOSITORY = 'molgenis/molgenis-py-eucan-connect'
             }
             steps {
                 timeout(time: 15, unit: 'MINUTES') {

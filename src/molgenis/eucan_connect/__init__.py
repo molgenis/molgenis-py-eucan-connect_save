@@ -6,7 +6,7 @@ else:
     from importlib_metadata import PackageNotFoundError, version  # pragma: no cover
 
 try:
-    dist_name = "<#REPO-NAME#>"
+    dist_name = "molgenis-py-eucan-connect"
     __version__ = version(dist_name)
 except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"

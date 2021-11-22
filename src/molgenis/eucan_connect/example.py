@@ -18,7 +18,7 @@
 # import logging
 # import sys
 #
-# from molgenis.<#PACKAGE-NAME#> import __version__
+# from molgenis.eucan_connect import __version__
 #
 # _logger = logging.getLogger(__name__)
 #
@@ -37,7 +37,7 @@
 #     parser.add_argument(
 #         "--version",
 #         action="version",
-#         version="<#REPO-NAME#> {ver}".format(ver=__version__),
+#         version="molgenis-py-eucan_connect {ver}".format(ver=__version__),
 #     )
 #     parser.add_argument(
 #         "-v",
@@ -100,6 +100,6 @@
 #     # After installing your project with pip, users can also run your Python
 #     # modules as scripts via the ``-m`` flag, as defined in PEP 338::
 #     #
-#     #     python -m molgenis.<#PACKAGE-NAME#>.skeleton 42
+#     #     python -m molgenis.eucan_connect.skeleton 42
 #     #
 #     run()
