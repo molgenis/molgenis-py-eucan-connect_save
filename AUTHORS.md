@@ -1,3 +1,3 @@
 # Contributors
 
-* <#CHANGE-ME#>
+Dieuwke Roelofs-Prins < https://github.com/dtroelofsprins >
