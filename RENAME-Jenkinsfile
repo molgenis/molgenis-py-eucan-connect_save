@@ -1,0 +1,138 @@
+pipeline {
+    agent {
+        kubernetes {
+            label 'python-stretch'
+        }
+    }
+    stages {
+        stage('Prepare') {
+            steps {
+                script {
+                    env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                }
+                container('vault') {
+                    script {
+                        env.PYPI_USERNAME = sh(script: 'vault read -field=username secret/ops/account/pypi', returnStdout: true)
+                        env.PYPI_PASSWORD = sh(script: 'vault read -field=password secret/ops/account/pypi', returnStdout: true)
+                        env.TESTPYPI_USERNAME = sh(script: 'vault read -field=username secret/ops/account/testpypi', returnStdout: true)
+                        env.TESTPYPI_PASSWORD = sh(script: 'vault read -field=password secret/ops/account/testpypi', returnStdout: true)
+                        env.GITHUB_TOKEN = sh(script: 'vault read -field=value secret/ops/token/github', returnStdout: true)
+                        env.SONAR_TOKEN = sh(script: 'vault read -field=value secret/ops/token/sonar', returnStdout: true)
+                    }
+                }
+                container('python') {
+                    script {
+                        sh "pip install tox"
+                        sh "pip install pre-commit"
+                        sh "pre-commit install"
+                    }
+                }
+            }
+        }
+        stage('Build: [ pull request ]') {
+            when {
+                changeRequest()
+            }
+            steps {
+                container('python') {
+                    sh "tox"
+                    sh "pre-commit run --all-files"
+                }
+                container('sonar') {
+                    sh "sonar-scanner -Dsonar.github.oauth=${env.GITHUB_TOKEN} -Dsonar.pullrequest.base=${CHANGE_TARGET} -Dsonar.pullrequest.branch=${BRANCH_NAME} -Dsonar.pullrequest.key=${env.CHANGE_ID} -Dsonar.pullrequest.provider=GitHub -Dsonar.pullrequest.github.repository=molgenis/<#REPO-NAME#>"
+                }
+            }
+        }
+        stage('Build: [ main ]') {
+            when {
+                branch 'main'
+            }
+            steps {
+                milestone 1
+                container('python') {
+                    sh "tox"
+                    sh "pre-commit run --all-files"
+                }
+                container('sonar') {
+                    sh "sonar-scanner"
+                }
+            }
+        }
+        stage('Release: [ main ]') {
+            when {
+                branch 'main'
+            }
+            environment {
+                REPOSITORY = 'molgenis/<#REPO-NAME#>'
+            }
+            steps {
+                timeout(time: 15, unit: 'MINUTES') {
+                    script {
+                        env.RELEASE_SCOPE = input(
+                                message: 'Do you want to release?',
+                                ok: 'Release to TestPyPi',
+                                parameters: [
+                                        choice(choices: 'patch\nminor\nmajor', description: '', name: 'RELEASE_SCOPE')
+                                ]
+                        )
+                    }
+                }
+                milestone 2
+                container('python') {
+                    sh "git remote set-url origin https://${GITHUB_TOKEN}@github.com/${REPOSITORY}.git"
+                    sh "git checkout -f main"
+                    sh "git fetch --tags"
+
+                    // bump the version based on the last tag and create a new tag
+                    sh "pip install bumpversion"
+                    script {
+                        env.NEW_PACKAGE_VERSION = sh(script: "sh bump-version.sh", returnStdout: true).trim()
+                    }
+
+                    // undo the formatting changes made by bumpversion to setup.cfg
+                    sh "git checkout ."
+
+                    // build and publish the release
+                    sh "tox -e build"
+                    sh "tox -e publish -- --repository testpypi --username ${TESTPYPI_USERNAME} --password ${TESTPYPI_PASSWORD}"
+
+                    // push the new tag to the repository
+                    sh "git push --tags origin main"
+                }
+                timeout(time: 60, unit: 'MINUTES') {
+                    script {
+                        env.RELEASE_SCOPE = input(
+                                message: "Test the release at: \nhttps://test.pypi.org/project/${REPOSITORY}/${NEW_PACKAGE_VERSION}/ \nContinue the release if it's ok, abort otherwise.",
+                                ok: 'Release to PyPi'
+                        )
+                    }
+                }
+                container('python') {
+                    // do the actual release to PyPi
+                    sh "tox -e publish -- --repository pypi --username ${PYPI_USERNAME} --password ${PYPI_PASSWORD}"
+
+                    hubotSend(message: "${REPOSITORY} ${NEW_PACKAGE_VERSION} has been released! :tada: https://pypi.org/project/${REPOSITORY}/", status:'SUCCESS')
+                }
+            }
+        }
+    }
+    post{
+        always {
+            junit 'reports/junit.xml'
+        }
+        success {
+            notifySuccess()
+        }
+        failure {
+            notifyFailed()
+        }
+    }
+}
+
+def notifySuccess() {
+    hubotSend(message: 'Build success', status:'INFO', site: 'slack-pr-app-team')
+}
+
+def notifyFailed() {
+    hubotSend(message: 'Build failed', status:'ERROR', site: 'slack-pr-app-team')
+}
