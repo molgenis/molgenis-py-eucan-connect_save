@@ -110,8 +110,7 @@ class Eucan:
         """
         Inserts the data of the source catalogue to the EUCAN-Connect Catalogue
         This happens in two phases:
-        1. All data from the source catalogue are removed
-           from the EUCAN-Connect Catalogue
+        1. All source catalogue data are removed from the EUCAN-Connect Catalogue
         2. Data from the source catalogue are inserted into EUCAN-Connect Catalogue
         """
         self.warnings = []
