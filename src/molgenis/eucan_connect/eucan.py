@@ -96,7 +96,6 @@ class Eucan:
         """
         Inserts new reference data into the EUCAN-Connect Catalogue
         """
-        self.warnings = []
         self.printer.print_sub_header("📤 Importing new reference data")
         self.printer.indent()
 
@@ -114,8 +113,6 @@ class Eucan:
         1. All source catalogue data are removed from the EUCAN-Connect Catalogue
         2. Data from the source catalogue are inserted into EUCAN-Connect Catalogue
         """
-        self.warnings = []
-
         self.printer.print_sub_header(
             f"📤 Importing source catalogue {catalogue_data.catalogue.description}"
         )
