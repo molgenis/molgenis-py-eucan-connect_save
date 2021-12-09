@@ -11,7 +11,8 @@ from molgenis.eucan_connect.model import Catalogue
 class EucanWarning:
     """
     Class that contains a warning message. Use this when a problem occurs that
-    shouldn't cancel the current action (for example staging or publishing).
+    shouldn't cancel the current action (for example converting a source catalogue
+    to the EUCAN-Connect Catalogue model).
     """
 
     message: str
@@ -28,10 +29,10 @@ class EucanError(Exception):
 @dataclass
 class ErrorReport:
     """
-    Summary object. Stores errors and warnings that occurred for each node.
+    Summary object. Stores errors and warnings that occurred for each source catalogue.
     """
 
-    nodes: List[Catalogue]
+    catalogues: List[Catalogue]
     errors: DefaultDict[Catalogue, EucanError] = field(
         default_factory=lambda: defaultdict(list)
     )
