@@ -62,11 +62,12 @@ class Eucan:
         # Get the data from the source catalogue(s)
         if catalogue.catalogue_type == "BirthCohorts":
             # Get the data from the source catalogue type birth cohorts
-            print("Birth cohort data. No module available yet!")
-            # catalogue_data = self._get_bc_data(catalogue)
-        if catalogue.catalogue_type == "Mica":
+            raise EucanError("Birth cohort data. No module available yet!")
+        elif catalogue.catalogue_type == "Mica":
             # Get the data from the source catalogue type Mica
             catalogue_data = self._get_mica_data(catalogue)
+        else:
+            raise EucanError(f"Unknown catalogue type {catalogue.catalogue_type}")
 
         # Import any possible new references into the EUCAN-Connect Catalogue
         self._add_new_ref_data(self.ref_data, importer, report)
@@ -81,7 +82,7 @@ class Eucan:
                 f"📥 Get data of source catalogue {catalogue.description}"
             )
             return Mica(
-                self.session, IsoCountryData, self.ref_data, self.printer
+                self.session, self.iso_country_data, self.ref_data, self.printer
             ).mica_data(catalogue)
 
         except MolgenisRequestError as e:
