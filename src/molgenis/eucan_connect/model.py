@@ -18,6 +18,10 @@ class TableType(Enum):
         return [type_ for type_ in cls]
 
     @property
+    def table(self) -> str:
+        return f"{self.value}"
+
+    @property
     def base_id(self) -> str:
         return f"eucan_{self.value}"
 
@@ -135,6 +139,7 @@ class IsoCountryData:
     """List with a dictionary per country"""
 
     def get_country_id(self, country_description: str) -> str:
+        iso_country = None
         for iso_type in self.iso_country_data[0].keys():
             iso_country = next(
                 (
@@ -149,7 +154,7 @@ class IsoCountryData:
         if iso_country:
             return iso_country["iso2_code"]
         else:
-            return None
+            return ""
 
 
 class RefEntity(Enum):
@@ -199,12 +204,24 @@ class RefTable:
 class RefData:
     """Container object storing the reference entity data."""
 
-    ref_entity: RefEntity
+    # ref_entity: RefEntity
     table_by_type: Dict[RefEntity, RefTable]
 
-    def add_new_ref(self, ref_entity, new_ref):
+    @staticmethod
+    def invalid_id_characters():
+        replacements = [
+            {" ": "_"},
+            {"-": "_till_"},
+            {"/": "_or_"},
+            {"+": "Plus"},
+            {"<": "before_"},
+        ]
+
+        return replacements
+
+    def add_new_ref(self, ref_entity, new_ref, ref_description):
         refs = self.table_by_type[RefEntity(ref_entity)].rows
-        refs.append({"id": new_ref, "label": new_ref})
+        refs.append({"id": new_ref, "label": ref_description})
         self.table_by_type[RefEntity(ref_entity)] = RefTable.of(
             table_type=ref_entity, rows=refs
         )
@@ -215,22 +232,8 @@ class RefData:
         return all_refs
 
     @staticmethod
-    def from_dict(
-        ref_entity: RefEntity, tables: Dict[RefEntity, RefTable]
-    ) -> "RefData":
+    def from_dict(tables: Dict[RefEntity, RefTable]) -> "RefData":
         return RefData(
-            ref_entity=ref_entity,
+            # ref_entity=ref_entity,
             table_by_type=tables,
         )
-
-
-# @dataclass(frozen=True)
-# class EucanEntities:
-#     """
-#     Object containing data of the EUCAN-Cannect Catalogue entities.
-#     """
-#
-#     events: List[dict]
-#     populations: List[dict]
-#     persons: List[dict]
-#     studies: List[dict]

@@ -1,21 +1,18 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 from urllib.parse import quote_plus
 
 import requests
 
 from molgenis.client import Session
 from molgenis.eucan_connect import utils
-from molgenis.eucan_connect.errors import EucanWarning
 from molgenis.eucan_connect.model import (
     Catalogue,
-    CatalogueData,
     IsoCountryData,
     RefData,
     RefEntity,
     RefTable,
     TableMeta,
 )
-from molgenis.eucan_connect.printer import Printer
 
 
 class ExtendedSession(Session):
@@ -59,8 +56,6 @@ class EucanSession(ExtendedSession):
 
     def __init__(self, *args, **kwargs):
         super(EucanSession, self).__init__(*args, **kwargs)
-        self.printer = Printer()
-        self.warnings: List[EucanWarning] = []
 
     CATALOGUES_TABLE = "eucan_source_catalogues"
 
@@ -109,24 +104,11 @@ class EucanSession(ExtendedSession):
             tables[ref_entity] = RefTable.of(
                 table_type=ref_entity, rows=self._get_ref_entity_data(id_)
             )
+        return RefData.from_dict(tables=tables)
 
-        return RefData.from_dict(ref_entity=RefEntity, tables=tables)
-
-    def set_study_mrefs(
-        self, catalogue_data: CatalogueData, mref_data
-    ) -> CatalogueData:
+    def _get_ref_entity_data(self, entity_type_id: str) -> List[dict]:
         """
-        Fills the mrefs of the EUCAN-Connect Catalogue study data
-        """
-        for study in catalogue_data.studies.rows:
-            no_prefix_id = study["id"][study["id"].find(":studyID:") + 9 :]
-            for attribute in mref_data[no_prefix_id].keys():
-                study[attribute] = mref_data[no_prefix_id][attribute]
-        return catalogue_data
-
-    def _get_ref_entity_data(self, entity_type_id: str) -> Dict:
-        """
-        Returns all the rows of an reference entity type
+        Returns all the rows of a reference entity type
         :return: a list of dictionaries
         """
 

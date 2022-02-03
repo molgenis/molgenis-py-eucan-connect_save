@@ -1,4 +1,3 @@
-# from molgenis.eucan_connect.errors import EucanError #, EucanWarning, EucanReport
 from molgenis.eucan_connect.errors import ErrorReport, EucanError, EucanWarning
 from molgenis.eucan_connect.model import Catalogue
 
@@ -56,16 +55,20 @@ class Printer:
         self.print("📋 Summary")
         self.print("==========")
 
-    #     for source in report.sources:
-    #         if source in report.errors:
-    #             message = f"❌ Source catalogue {source.Source} failed"
-    #             if source in report.warnings:
-    #                 message += f" with {len(report.warnings[node])} warning(s)"
-    #         elif source in report.warnings:
-    #             message = (
-    #                 f"⚠️ Source catalogue {source.Source} finished successfully with "
-    #                 f"{len(report.warnings[node])} warning(s)"
-    #             )
-    #         else:
-    #             message = f"✅ Source catalogue {source.Source} finished successfully"
-    #         self.print(message)
+        for catalogue in report.catalogues:
+            if catalogue in report.errors:
+                message = f"❌ Source catalogue {catalogue.description} failed"
+                if catalogue in report.warnings:
+                    message += f" with {len(report.warnings[catalogue])} warning(s)"
+            elif catalogue in report.warnings:
+                message = (
+                    f"⚠️ Source catalogue {catalogue.description} "
+                    f"finished successfully with "
+                    f"{len(report.warnings[catalogue])} warning(s)"
+                )
+            else:
+                message = (
+                    f"✅ Source catalogue {catalogue.description} "
+                    f"finished successfully"
+                )
+            self.print(message)
