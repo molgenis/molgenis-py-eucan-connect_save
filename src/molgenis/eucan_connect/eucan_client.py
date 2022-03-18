@@ -1,17 +1,22 @@
 from typing import List, Optional
 from urllib.parse import quote_plus
 
+import numpy as np
+import pandas as pd
 import requests
 
 from molgenis.client import Session
 from molgenis.eucan_connect import utils
 from molgenis.eucan_connect.model import (
     Catalogue,
+    CatalogueData,
     IsoCountryData,
     RefData,
     RefEntity,
     RefTable,
+    Table,
     TableMeta,
+    TableType,
 )
 
 
@@ -119,6 +124,74 @@ class EucanSession(ExtendedSession):
         ref_data = utils.to_upload_format(eucan_ref_data)
 
         return ref_data
+
+    def create_catalogue_data(
+        self, catalogue: Catalogue, df_in: pd.DataFrame
+    ) -> CatalogueData:
+        """
+        Converts processed source catalogue data to the EUCAN-Catalogue format
+        Fills the four EUCAN-Connect tables for the specific source catalogue
+
+        :param catalogue: the source catalogue
+        :param df_in: the source catalogue data in pandas DataFrame
+        :return: a CatalogueData object
+        """
+
+        tables = dict()
+        for table_type in TableType.get_import_order():
+            id_ = table_type.base_id
+            table = table_type.table
+            meta = self.get_meta(id_)
+
+            tables[table_type] = Table.of(
+                table_type=table_type,
+                meta=meta,
+                rows=self._get_uploadable_data(catalogue, df_in, table),
+            )
+
+        return CatalogueData.from_dict(
+            catalogue=catalogue, source=catalogue.description, tables=tables
+        )
+
+    @staticmethod
+    def _get_uploadable_data(
+        catalogue: Catalogue, df_data: pd.DataFrame, table_type: str
+    ) -> List[dict]:
+        """
+        Returns all the rows of an entity type in the dataFrame, transformed to
+        the uploadable format.
+        """
+
+        table_columns = [x for x in df_data.columns if table_type in x[:10]]
+        table_data = df_data[table_columns].to_dict("records")
+        # Remove the "table" name from the columns and remove missing values
+        for row in table_data:
+            for tab_column in table_columns:
+                column = tab_column.replace(table_type + "_", "", 1)
+                row[column] = row[tab_column]
+                del row[tab_column]
+
+                if type(row[column]) is np.ndarray:
+                    row[column] = list(row[column])
+
+                if utils.isnan(row[column]):
+                    del row[column]
+
+        # Remove duplicate records
+        unique_data = [
+            i for n, i in enumerate(table_data) if i not in table_data[n + 1 :]
+        ]
+
+        # Remove empty records
+        while {} in unique_data:
+            unique_data.remove({})
+
+        # Add the source catalogue
+        unique_data = [
+            dict(item, source_catalogue=catalogue.code) for item in unique_data
+        ]
+
+        return unique_data
 
     @staticmethod
     def _to_catalogues(catalogues: List[dict]):

@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from molgenis.eucan_connect.errors import ErrorReport, EucanError, EucanWarning
 from molgenis.eucan_connect.model import Catalogue
 
@@ -72,3 +74,9 @@ class Printer:
                     f"finished successfully"
                 )
             self.print(message)
+
+    @contextmanager
+    def indentation(self):
+        self.indent()
+        yield
+        self.dedent()

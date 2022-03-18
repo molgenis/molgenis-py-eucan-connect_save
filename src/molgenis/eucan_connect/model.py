@@ -204,7 +204,6 @@ class RefTable:
 class RefData:
     """Container object storing the reference entity data."""
 
-    # ref_entity: RefEntity
     table_by_type: Dict[RefEntity, RefTable]
 
     @staticmethod
@@ -226,7 +225,6 @@ class RefData:
             table_type=ref_entity, rows=refs
         )
 
-    #  @property TODO: is dit een property?
     def all_refs(self, ref_entity) -> List[str]:
         all_refs = list(self.table_by_type[RefEntity(ref_entity)].rows_by_id.keys())
         return all_refs
@@ -234,6 +232,5 @@ class RefData:
     @staticmethod
     def from_dict(tables: Dict[RefEntity, RefTable]) -> "RefData":
         return RefData(
-            # ref_entity=ref_entity,
             table_by_type=tables,
         )

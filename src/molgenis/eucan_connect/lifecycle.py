@@ -19,17 +19,14 @@ class LifeCycle:
     EUCAN-Connect Catalogue data model.
     """
 
-    def __init__(
-        self,
-        session: EucanSession,
-        printer: Printer,
-    ):
+    def __init__(self, session: EucanSession, printer: Printer, catalogue: Catalogue):
         """Constructs a new Session.
         Args:
         url -- URL of the REST API. Should be of form 'http[s]://<EMX2 server>[:port]/'
         Examples:
         session = Session('https://data-catalogue.molgeniscloud.org/')
         """
+        self.catalogue = catalogue
         self.eucan_session = session
         self._lc_session = requests.Session()
         self._lc_headers = {
@@ -40,21 +37,20 @@ class LifeCycle:
         self.printer = printer
         self.warnings: List[EucanWarning] = []
 
-    def lifecycle_data(self, catalogue: Catalogue) -> pd.DataFrame:
+    def lifecycle_data(self) -> pd.DataFrame:
         """
         Retrieves data from the provided source catalogue
         """
-        self.catalogue = catalogue
         self.printer.print(f"🗑 Get {self.catalogue.description} studies")
 
         # Retrieve the list with the cohorts in the source catalogue:
         lc_cohort_data = self.get_lc_cohort_data()
 
         if len(lc_cohort_data) == 0:
-            raise EucanError(f"Number of records for {catalogue.description} is 0")
+            raise EucanError(f"Number of records for {self.catalogue.description} is 0")
         else:
             self.printer.print_sub_header(
-                f"Number of cohorts retrieved for {catalogue.description} is "
+                f"Number of cohorts retrieved for {self.catalogue.description} is "
                 f"{len(lc_cohort_data)}"
             )
 
@@ -83,7 +79,7 @@ class LifeCycle:
                                                                 endYear {name},
                                                                 startMonth {code},
                                                                 endMonth {code},
-                                                      #   areasOfInformation {name},
+                                                         areasOfInformation {name},
                                                          dataCategories {name},
                                                          sampleCategories {name}}}}"""
         lc_url = self.catalogue.catalogue_url + "/catalogue/graphql"
@@ -132,8 +128,7 @@ class LifeCycle:
 
         # Rename the columns of the extracted data
         df_cohorts.rename(
-            columns={  # "events_areasOfInformation":
-                #    "events_type_administrative_databases",
+            columns={
                 "persons_contact.title.name": "persons_title",
                 "persons_contact.firstName": "persons_first_name",
                 "persons_contact.email": "persons_email",
@@ -184,7 +179,7 @@ class LifeCycle:
             df_converted["population_name"].isnull(), "population_id"
         ] = np.nan
 
-        # Add prefix to the last name
+        # Add a prefix to the last name
         df_converted["persons_last_name"] = (
             df_converted["persons_contact.prefix"]
             .fillna("")
@@ -197,7 +192,7 @@ class LifeCycle:
             + df_converted["events_endYear.name"].fillna("")
         )
 
-        # Add study acronym to the events and population name
+        # Add the study acronym to the events and population name
         df_converted["events_name"] = (
             df_converted["study_acronym"] + " - " + df_converted["events_name"]
         )
@@ -223,25 +218,32 @@ class LifeCycle:
         df_converted = self._convert_list_values(df_converted)
 
         # Create and fill the principal investigator and contact person columns
-        # TODO: ik krijg dit (nog) niet in een stap.
-        #  Wanneer ik ipv "Yes" df_convert["persons_id"] doe dan werkt het niet
-        df_converted["temp_pi"] = [
-            "Yes" if x == "Principal Investigator" else np.nan
-            for x in df_converted["persons_contribution_types"]
-        ]
-        df_converted["temp_pi"] = df_converted["persons_id"].where(
-            df_converted["temp_pi"] == "Yes", np.nan
+        df_converted["temp_pi"] = np.where(
+            df_converted["persons_contribution_types"].notna(),
+            np.where(
+                df_converted["persons_contribution_types"]
+                .str.join(" ")
+                .str.contains("Principal Investigator"),
+                df_converted["persons_id"],
+                np.nan,
+            ),
+            np.nan,
         )
 
-        df_converted["temp_contacts"] = [
-            "Yes" if x == "Contact person" else np.nan
-            for x in df_converted["persons_contribution_types"]
-        ]
-        df_converted["temp_contacts"] = df_converted["persons_id"].where(
-            df_converted["temp_contacts"] == "Yes", np.nan
+        df_converted["temp_contacts"] = np.where(
+            df_converted["persons_contribution_types"].notna(),
+            np.where(
+                df_converted["persons_contribution_types"]
+                .str.join(" ")
+                .str.contains("Contact person"),
+                df_converted["persons_id"],
+                np.nan,
+            ),
+            np.nan,
         )
-        # TODO Discuss: As not all persons have a contribution type,
-        #  fill in contact persons for the missing ones
+
+        # As not all persons have a contribution type,
+        # fill missing ones with type Contact Person
         df_converted["temp_contacts"] = np.where(
             df_converted["temp_pi"].isna(),
             df_converted["temp_contacts"].fillna(df_converted["persons_id"]),
@@ -268,6 +270,7 @@ class LifeCycle:
                 "events_endYear.name",
                 "events_startMonth.code",
                 "events_endMonth.code",
+                "events_areasOfInformation",
                 "events_dataCategories",
                 "events_sampleCategories",
                 "population_ageGroups",
@@ -283,11 +286,16 @@ class LifeCycle:
 
         return df_converted
 
-    def _convert_list_values(self, df_list_conversion: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _convert_list_values(df_list_conversion: pd.DataFrame) -> pd.DataFrame:
         # Convert per column the list items to columns
         list_columns = {
             "study_dataAccessConditions": ["_name", "study_access_possibility"],
             "persons_contributionType": ["_name", "persons_contribution_types"],
+            "events_areasOfInformation": [
+                "_name",
+                "events_type_administrative_databases",
+            ],
             "events_sampleCategories": ["_name", "events_biosamples_type"],
             "events_dataCategories": ["_name", "events_datasources_type"],
             "population_ageGroups": ["_code", "population_recruitment_sources"],
@@ -297,7 +305,7 @@ class LifeCycle:
                 [pd.Series(x) for x in df_list_conversion[df_col]]
             )
             df_converted_list.columns = [
-                "list_col{}".format(x + 1) for x in df_converted_list.columns
+                "list_col{}".format(int(x) + 1) for x in df_converted_list.columns
             ]
 
             for list_col in df_converted_list.columns:
@@ -343,9 +351,8 @@ class LifeCycle:
 
         return df_list_conversion
 
-    def _extract_data(
-        self, json_data: List[dict], df_in: pd.DataFrame, table_prefix: Dict
-    ):
+    @staticmethod
+    def _extract_data(json_data: List[dict], df_in: pd.DataFrame, table_prefix: Dict):
         df_extracted = df_in
         for var in ["contributors", "collectionEvents", "subcohorts"]:
             df_no_nan = df_in.dropna(subset=[table_prefix["study"] + var])
@@ -368,7 +375,8 @@ class LifeCycle:
             df_extracted.drop([table_prefix["study"] + var], axis=1, inplace=True)
         return df_extracted
 
-    def _group_column_information(self, df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _group_column_information(df: pd.DataFrame) -> pd.DataFrame:
         """
         Function to combine the column information of the same study in multiple rows
         into one column

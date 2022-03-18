@@ -31,3 +31,9 @@ def to_upload_format(rows: List[dict]) -> List[dict]:
 
         upload_format.append(row)
     return upload_format
+
+
+def isnan(value):
+    # A NaN implemented following the standard, is the only value for which
+    # the inequality comparison with itself should return True:
+    return value != value

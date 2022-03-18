@@ -8,5 +8,5 @@ integrating data from external catalogues. For example BirthCohorts and Maelstro
 
 ## Usage
 
-These tools can be used as a library in a script or as a command line tool. In both
-cases, start by installing the library with `pip install molgenis-py-eucan-connect`.
+These tools can be used as a library in a script.
+Start by installing the library with `pip install molgenis-py-eucan-connect`.
