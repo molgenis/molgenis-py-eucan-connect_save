@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from molgenis.eucan_connect import utils
@@ -50,3 +51,15 @@ def test_to_upload_format(rows):
         },
         {"id": "studyB", "data_collection_events": ["dce_A"]},
     ]
+
+
+def test_isnan():
+    x1 = np.nan
+    x2 = "test"
+    x3 = ["test1", "test2"]
+    x4 = np.NaN
+
+    assert utils.isnan(x1) is True
+    assert utils.isnan(x2) is False
+    assert utils.isnan(x3) is False
+    assert utils.isnan(x4) is True

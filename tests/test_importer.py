@@ -1,10 +1,11 @@
 from unittest import mock
 from unittest.mock import MagicMock
 
-from molgenis.eucan_connect.errors import EucanWarning
-from molgenis.eucan_connect.model import Catalogue, RefEntity, TableMeta, TableType
+import pytest
 
-# ToDo: Add "in case it fails" / error tests?
+from molgenis.client import MolgenisRequestError
+from molgenis.eucan_connect.errors import EucanError, EucanWarning
+from molgenis.eucan_connect.model import Catalogue, RefEntity, TableType
 
 
 def test_import_catalogue(
@@ -13,7 +14,7 @@ def test_import_catalogue(
     session,
     printer,
 ):
-    importer._delete_rows = MagicMock()
+    importer._delete_rows = MagicMock(side_effect=importer._delete_rows)
     existing_catalogue_data = MagicMock()
     events = MagicMock()
     persons = MagicMock()
@@ -29,9 +30,6 @@ def test_import_catalogue(
     importer._get_eucan_ids = MagicMock()
 
     importer.import_catalogue_data(catalogue_data)
-
-    # Ik zou verwachten dat deze meerdere keren werd gecalled, maar zegt 0 keer
-    # assert importer._get_eucan_ids.assert_called_once()
 
     assert session.add_batched.mock_calls == [
         mock.call(catalogue_data.persons.type.base_id, catalogue_data.persons.rows),
@@ -49,43 +47,17 @@ def test_import_catalogue(
         mock.call(catalogue_data.persons, catalogue_data.catalogue),
     ]
 
+    assert importer._get_eucan_ids.call_count == 4
 
-def test_import_references(
-    importer,
-    ref_data,
-    session,
-    printer,
-):
+
+def test_import_references(importer, ref_data, session, printer, meta_data):
     ref_data.add_new_ref("biosamples", "New_biosample", "Test add new biosample")
     ref_data.add_new_ref("data_sources", "New_datasource", "Test add new datasource")
     ref_data.add_new_ref("database_types", "New_database_type", "Test add new db type")
     ref_data.add_new_ref(
         "recruitment_sources", "New_recr_source", "Test new recruitment source"
     )
-    session.get_meta = MagicMock()
-    meta_data = TableMeta(
-        meta={
-            "links": {"self": "https://test_url"},
-            "data": {
-                "id": "eucan_biosamples",
-                "label": "BioSamples",
-                "attributes": {
-                    "items": [
-                        {
-                            "data": {
-                                "id": "aaaac",
-                                "label": "ID",
-                                "name": "id",
-                                "type": "string",
-                                "idAttribute": True,
-                            }
-                        }
-                    ]
-                },
-            },
-        }
-    )
-    session.get_meta.return_value = meta_data
+    session.get_meta = MagicMock(return_value=meta_data)
 
     importer.import_reference_data(ref_data)
 
@@ -109,6 +81,37 @@ def test_import_references(
     ]
 
 
+def test_get_ids_fails(importer, session, fake_catalogue_data):
+    catalogue = Catalogue("Test", "Test catalogue", "test_url", "Source catalogue")
+    session.get.side_effect = MolgenisRequestError("")
+    with pytest.raises(EucanError) as e:
+        importer._get_eucan_ids(fake_catalogue_data.persons, catalogue)
+
+    assert str(e.value) == "Error getting rows from eucan_persons"
+
+
+def test_add_data_fails(importer, session, fake_catalogue_data, ref_data, meta_data):
+    session.add_batched.side_effect = MolgenisRequestError("")
+    session.get_meta = MagicMock(return_value=meta_data)
+    with pytest.raises(EucanError) as e:
+        importer.import_catalogue_data(fake_catalogue_data)
+
+    assert str(e.value) == "Error importing rows to eucan_persons"
+
+    with pytest.raises(EucanError) as e:
+        importer.import_reference_data(ref_data)
+
+    assert str(e.value) == "Error importing rows to eucan_biosamples"
+
+
+def test_delete_rows_fails(importer, session, fake_catalogue_data):
+    session.delete_list.side_effect = MolgenisRequestError("")
+    with pytest.raises(EucanError) as e:
+        importer.import_catalogue_data(fake_catalogue_data)
+
+    assert str(e.value) == "Error deleting existing rows from eucan_persons"
+
+
 def test_delete_rows(importer, session, fake_catalogue_data):
     catalogue = Catalogue("Test", "Test catalogue", "test_url", "Source catalogue")
     importer._delete_rows(fake_catalogue_data.persons, catalogue)
@@ -123,10 +126,6 @@ def test_delete_rows(importer, session, fake_catalogue_data):
             "is not in the source catalogue anymore."
         )
     ]
-
-    # A simple assert_called_with does not work as the order of
-    # ["person_deleted_id", "person_id"] in the mock can differ per run and the test
-    # is therefore not consistent
 
     assert session.delete_list.call_count == 1
 

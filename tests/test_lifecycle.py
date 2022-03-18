@@ -8,9 +8,11 @@ from molgenis.eucan_connect.lifecycle import LifeCycle
 from molgenis.eucan_connect.model import Catalogue
 
 
-def test_lifecycle_data(eucan, lifecycle_data, lifecycle_created_df):
-    lifecycle = LifeCycle(eucan, eucan.printer)
+def test_lifecycle_data(
+    eucan, lifecycle_data, lifecycle_created_df, lifecycle_converted_df
+):
     catalogue = Catalogue("LC", "LifeCycle", "lifecycle_url", "LifeCycle")
+    lifecycle = LifeCycle(eucan, eucan.printer, catalogue)
     lifecycle.get_lc_cohort_data = MagicMock()
     lifecycle.get_lc_cohort_data.return_value = lifecycle_data
     lifecycle._create_df = MagicMock()
@@ -18,10 +20,7 @@ def test_lifecycle_data(eucan, lifecycle_data, lifecycle_created_df):
     lifecycle._convert_values = MagicMock()
     lifecycle._convert_values.return_value = lifecycle_created_df
 
-    # ToDo: Also mock and test Lifecycle _convert_list_values, _extract_data and
-    #  _group_column_information?
-
-    lifecycle.lifecycle_data(catalogue)
+    lifecycle.lifecycle_data()
     lifecycle.get_lc_cohort_data.assert_called_once()
 
     assert eucan.printer.print.mock_calls == [mock.call("🗑 Get LifeCycle studies")]
@@ -37,8 +36,14 @@ def test_create_df_and_convert_values(
     eucan, lifecycle_data, lifecycle_created_df, lifecycle_converted_df
 ):
     catalogue = Catalogue("LC", "LifeCycle", "lifecycle_url", "LifeCycle")
-    lifecycle = LifeCycle(eucan, eucan.printer)
-    lifecycle.catalogue = catalogue
+    lifecycle = LifeCycle(eucan, eucan.printer, catalogue)
+    lifecycle._convert_list_values = MagicMock(
+        side_effect=lifecycle._convert_list_values
+    )
+    lifecycle._extract_data = MagicMock(side_effect=lifecycle._extract_data)
+    lifecycle._group_column_information = MagicMock(
+        side_effect=lifecycle._group_column_information
+    )
 
     created_df = lifecycle._create_df(lifecycle_data)
 
@@ -50,6 +55,7 @@ def test_create_df_and_convert_values(
     np_ndarrays = [
         "events_biosamples_type",
         "events_datasources_type",
+        "events_type_administrative_databases",
         "population_recruitment_sources",
         "study_principle_investigators",
         "study_contacts",
@@ -75,5 +81,9 @@ def test_create_df_and_convert_values(
         )
 
         pd.testing.assert_series_equal(converted_ndarrays, check_ndarrays)
-        # assert np.array_equal(converted_ndarrays, check_ndarrays, equal_nan=True)
-        # np.testing.assert_array_equal(converted_ndarrays, check_ndarrays)
+        assert np.array_equal(converted_ndarrays, check_ndarrays, equal_nan=True)
+        np.testing.assert_array_equal(converted_ndarrays, check_ndarrays)
+
+    lifecycle._convert_list_values.assert_called_once()
+    lifecycle._extract_data.assert_called_once()
+    lifecycle._group_column_information.assert_called_once()
