@@ -4,10 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+molgenis-py-eucan-connect = {editable = true, path = "."}
 
 [dev-packages]
 pytest = "*"
 pytest-cov = "*"
+python-dotenv = "*"
 setuptools = "*"
 tox = "*"
 

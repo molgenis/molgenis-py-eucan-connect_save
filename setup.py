@@ -1,5 +1,5 @@
 """
-    Setup file for molgenis-template-py.
+    Setup file for molgenis-py-eucan-connect.
     Use setup.cfg to configure your project.
 
     This file was generated with PyScaffold 4.1.1.
